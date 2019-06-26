@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Some Laba</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+    <style>
+        table {
+            width: 100%;
+        }
+
+        table,
+        td {
+            border: 1px solid #000;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 0.5rem;
+            width: 50%;
+        }
+
+        button.active {
+            background: rebeccapurple;
+        }
+    </style>
+</head>
+<body>
+<form id="form" name="form">
+    <table>
+        <tbody>
+        <tr>
+            <td id="textarea-source" class="source">
+                <label for="textarea">textarea</label>
+                <textarea id="textarea" data-disabled="disabled" data-name="data-textarea" name="textarea"></textarea>
+            </td>
+            <td id="textarea-value"></td>
+        </tr>
+
+        <tr>
+            <td id="text-source" class="source">
+                <label for="text">input text</label>
+                <input id="text" data-disabled="disabled" data-name="data-text" name="text" type="text">
+            </td>
+            <td id="text-value"></td>
+        </tr>
+
+        <tr>
+            <td id="checkbox-source" class="source">
+                <input id="checkbox" data-disabled="disabled" data-name="data-checkbox" name="checkbox" type="checkbox">
+                <label for="checkbox">input checkbox</label>
+            </td>
+            <td id="checkbox-value"></td>
+        </tr>
+
+        <tr>
+            <td id="text1-source" class="source">
+                <label for="text1">input text 2</label>
+                <input id="text1" data-disabled="disabled" data-name="data-some-text1" name="text1" type="text">
+            </td>
+            <td id="text1-value"></td>
+        </tr>
+
+        <tr>
+            <td id="button-source" class="source">
+                <button id="button" data-disabled="disabled" data-name="data-name" name="button" type="button">button</button>
+            </td>
+            <td id="button-value"></td>
+        </tr>
+
+        <tr>
+            <td id="super-puper-button-source" class="source">
+                <button id="super-puper-button" data-disabled="disabled" data-name="data-super-puper-button" name="super-puper" type="button">super puper button</button>
+            </td>
+            <td id="super-puper-button-value"></td>
+        </tr>
+
+        <tr>
+            <td id="super--button-source" class="source">
+                <button id="super--button" data-disabled="disabled" data-name="data-super--button" name="super" type="button">super button</button>
+            </td>
+            <td id="super--button-value"></td>
+        </tr>
+
+        <tr>
+            <td id="radio-source" class="source">
+                <input type="radio" id="radio1" data-disabled="disabled" data-name="data-radio" name="radio" value="radio1">
+                <label for="radio1">radio 1</label>
+
+                <input type="radio" id="radio2" data-disabled="disabled" data-name="data-radio" name="radio" value="radio2">
+                <label for="radio2">radio 2</label>
+
+                <input type="radio" id="radio3" data-disabled="disabled" data-name="data-radio" name="radio" value="radio3">
+                <label for="radio2">radio 3</label>
+            </td>
+            <td id="radio-value"></td>
+        </tr>
+
+        <tr>
+            <td id="select-source" class="source">
+                <label for="select">select</label>
+                <select id="select" data-disabled="disabled" data-name="data-select" name="select">
+                    <option selected>select item</option>
+                    <option value="1">One</option>
+                    <option value="2">Two</option>
+                    <option value="3">Three</option>
+                </select>
+            </td>
+            <td id="select-value"></td>
+        </tr>
+        </tbody>
+    </table>
+</form>
+
+<script>
+    /**
+     * Парсит DOM дерево в JSON
+     *
+     * @param {HTMLElement | Element} element
+     */
+    const parseDomThree = (element) => {
+        return Array
+            // делаем из NodeList массив
+            .from(element.children)
+            // проходимся по всем дочерним элементам
+            .map((child) => {
+                // собираем все атрибуты
+                const attributes = Array
+                    .from(child.attributes)
+                    .reduce((acc, { localName, value }) => ({ ...acc, [localName]: value }), {});
+
+                // текстовое содержимое элемента
+                if (child.innerText.length > 0) {
+                    attributes.innerText = child.innerText;
+                }
+
+                const tagName = child.tagName.toLowerCase();
+
+                switch (tagName) {
+                    case 'input':
+                        switch (attributes.type) {
+                            case 'radio':
+                            case 'checkbox':
+                                if (child.checked) {
+                                    attributes.checked = 'checked';
+                                }
+                                break;
+                            case 'text':
+                            default:
+                                if (child.value.length > 0) {
+                                    attributes.value = child.value;
+                                }
+                        }
+                        break;
+                    case 'textarea':
+                        if (child.value.length > 0) {
+                            attributes.innerText = child.value;
+                        }
+                        break;
+                    case 'option':
+                        if (child.selected) {
+                            attributes.selected = 'selected';
+                        }
+
+                        break;
+                }
+
+                Object.assign(attributes, child.dataset);
+
+                return {
+                    attributes,
+                    tagName,
+                    children: parseDomThree(child),
+                };
+            });
+    };
+
+    /**
+     * Собирает DOM дерево из JSON
+     *
+     * @param three
+     */
+    const buildDomTree = (three) => {
+        return three.map((item) => {
+            // создаем элемент
+            const element = document.createElement(item.tagName);
+
+            // добавляем ему атрибуты
+            if (Object.keys(item.attributes).length > 0) {
+                Object
+                    .entries(item.attributes)
+                    .forEach(([key, value]) => {
+                        if (key === 'innerText') {
+                            element[key] = value;
+                        } else {
+                            element.setAttribute(key, value);
+                        }
+                    });
+            }
+
+            // если есть дети, то добавляем их
+            if (item.children.length > 0) {
+                element.append(...buildDomTree(item.children));
+            }
+
+            return element;
+        });
+    };
+
+    // ждем полную загрузку DOM
+    document.addEventListener('DOMContentLoaded', () => {
+        // выбираем форму
+        const form = document.querySelector('[name=form]');
+        // подключаем сокеты
+        const socket = io();
+        // находим контолы формы
+        const controls = Array.from(form.elements);
+
+        // проходимся по всем контролам
+        controls.forEach((control) => {
+        	console.log('control', );
+            // если контрол - кнопка (тут был немножко проигрыш)
+            if (control.tagName.toLowerCase() === 'button') {
+                // обработчик события клик
+                control.addEventListener('click', ({ target }) => {
+                    const source = target.closest('.source');
+
+                    // если есть класс active
+                    if (target.classList.contains('active')) {
+                        // удаляем его
+                        target.classList.remove('active');
+                    } else {
+                        // добавляем если нет
+                        target.classList.add('active');
+                    }
+
+                    const data = {
+                        id: source.id,
+                        three: parseDomThree(source),
+                    };
+
+                    // отправляем на сокет
+                    socket.emit('change', data);
+                });
+            } else {
+                // любой другой контрол кроме кнопки
+                control.addEventListener('change', ({ target }) => {
+                    const source = target.closest('.source');
+
+                    const data = {
+                        id: source.id,
+                        three: parseDomThree(source),
+                    };
+
+                    // отправляем на сокет
+                    socket.emit('change', data);
+                });
+            }
+        });
+
+        // сокет прислал ответ
+        socket.on('change', (data = []) => {
+            // проходимся по всем значениям ответа
+            data.forEach((item) => {
+                // находим место куда нужно вставлять данные
+                const valuePlace = document.querySelector(`#${item.id.replace('source', '')}value`);
+
+                valuePlace.innerHTML = '';
+                valuePlace.append(...buildDomTree(item.three));
+            });
+        });
+    });
+</script>
+</body>
+</html>
